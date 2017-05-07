@@ -1,0 +1,12 @@
+trigger TranscriptTrigger on LiveChatTranscript (after update) {
+
+    List<LiveChatTranscript> trascriptListToDelete = new List<LiveChatTranscript>();
+    List<LiveChatTranscript> trascriptList = [select Id,Is_Spam__c from LiveChatTranscript where Id in :trigger.new]; 
+    for(LiveChatTranscript liveChatTranscript : trascriptList){
+    
+        if(liveChatTranscript.Is_Spam__c){
+            trascriptListToDelete.add(liveChatTranscript);
+        }
+    }
+    delete trascriptListToDelete;
+}

@@ -1,0 +1,55 @@
+trigger QuestionToKnowledgeBase on QuestionandAnswer__c (before insert, after insert, before update) {
+	
+    KBUtility.QuestionAndKB questionAndKBInstance;
+    List<Id> articleIdList = new List<Id>();
+    Map<String, QuestionandAnswer__c> articleToQuestionMap = new Map<String, QuestionandAnswer__c>();
+    
+    if(Trigger.isBefore && Trigger.isInsert){
+		
+        questionAndKBInstance = KBUtility.createArticle(Trigger.new);     
+        for(String articleUrl :questionAndKBInstance.articleUrlToQuestionMap.keySet()){
+            Durex_FAQ__kav article = questionAndKBInstance.articleUrlToArticleMap.get(articleUrl);
+            QuestionandAnswer__c question = questionAndKBInstance.articleUrlToQuestionMap.get(articleUrl);
+            question.Article_Id__c = article.Id;
+            articleIdList.add(article.Id);
+        }
+        //List<Durex_FAQ__kav> newlyInsertedArticles = [select Id, KnowledgeArticleId, chat_answer__c, question__c FROM Durex_FAQ__kav WHERE Id in :articleIdList];
+    }
+    
+    if(Trigger.isAfter && Trigger.isInsert){
+        
+        Map<String, String> articleToQueMap = new Map<String, String>();
+        for(QuestionandAnswer__c question :Trigger.new){
+            articleToQueMap.put(question.Article_Id__c, question.Id);
+        }
+        
+        List<Durex_FAQ__kav> articleToUpdate = [select Id, KnowledgeArticleId, UrlName, summary, chat_answer__c, question__c from Durex_FAQ__kav where Id in :articleToQueMap.keySet()];
+        for(Durex_FAQ__kav article :articleToUpdate){
+			article.Question__c = articleToQueMap.get(article.Id);
+        }
+        update articleToUpdate;
+        KBUtility.publishArticle(articleToUpdate);
+    }
+    
+    if(Trigger.isBefore && Trigger.isUpdate){
+        
+        Map<String, String> articleToQueMap = new Map<String, String>();
+        for(QuestionandAnswer__c question :Trigger.new){
+            articleToQueMap.put(question.Article_Id__c, question.Id);
+        }
+        
+        Map<Id, Durex_FAQ__kav> articleMap = new Map<Id, Durex_FAQ__kav>([select Id, KnowledgeArticleId, UrlName, summary, chat_answer__c, question__c from Durex_FAQ__kav where Id in :articleToQueMap.keySet()]);
+        System.debug('articleMap :'+articleMap);
+        KBUtility.archiveOnlineArticle(articleMap.values());
+        
+        questionAndKBInstance = KBUtility.createArticle(Trigger.new);     
+        for(String articleUrl :questionAndKBInstance.articleUrlToQuestionMap.keySet()){
+            Durex_FAQ__kav article = questionAndKBInstance.articleUrlToArticleMap.get(articleUrl);
+            QuestionandAnswer__c question = questionAndKBInstance.articleUrlToQuestionMap.get(articleUrl);
+            question.Article_Id__c = article.Id;
+            articleIdList.add(article.Id);
+        }
+        List<Durex_FAQ__kav> newlyInsertedArticles = [select Id, KnowledgeArticleId, chat_answer__c FROM Durex_FAQ__kav WHERE Id in :articleIdList];
+        KBUtility.publishArticle(newlyInsertedArticles);
+    } 
+}
